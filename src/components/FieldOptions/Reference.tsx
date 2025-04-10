@@ -34,17 +34,18 @@ const Reference = ({
       const fields = item?.fields ?? [];
   
       // Find the media field by key or type
-      const mediaField = fields.find(
-        (field: any) => field.key === generateKey('reference', fieldName) || field.type === 'reference'
+      const referenceField = fields.find(
+        (field: any) =>
+          field?.key === generateKey('reference', fieldName) || field?.type === 'reference'
       );
   
-      const mediaLinks = Array.isArray(mediaField?.value) ? mediaField.value : [];
-      console.log(mediaLinks);
+      const referenceLinks = Array.isArray(referenceField?.value) ? referenceField.value : [];
+      console.log(referenceLinks);
       const maxAllowed = parseInt(options?.[0] || '10');
       console.log(maxAllowed);
   
       console.log(canAddMore);
-      setCanAddMore(mediaLinks.length < maxAllowed);
+      setCanAddMore(referenceLinks.length < maxAllowed);
     });
   }, [sdk.field]);
   

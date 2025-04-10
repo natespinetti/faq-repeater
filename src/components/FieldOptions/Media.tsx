@@ -4,6 +4,14 @@ import { ValidationError } from '@contentful/app-sdk';
 import { generateKey } from '../../components/utility/generateKey';
 import { ContentfulComponentsFieldsAndFunctions } from 'components/types';
 
+type AssetReference = {
+  sys: {
+    id: string;
+    type: 'Link';
+    linkType: 'Asset';
+  };
+};
+
 const Media = ({
   item,
   items,
@@ -14,7 +22,8 @@ const Media = ({
   fieldName,
   options
 }: ContentfulComponentsFieldsAndFunctions) => {
-  const value = item.fields?.[fieldIndex]?.value || [];
+  const rawValue = item.fields?.[fieldIndex]?.value;
+  const value: AssetReference[] = Array.isArray(rawValue) ? rawValue : [];
   const [canAddMore, setCanAddMore] = useState(true);
 
   // Optional: limit to 2 assets max
@@ -26,7 +35,8 @@ const Media = ({
   
       // Find the media field by key or type
       const mediaField = fields.find(
-        (field: any) => field.key === generateKey('media', fieldName) || field.type === 'media'
+        (field: any) =>
+          field?.key === generateKey('media', fieldName) || field?.type === 'media'
       );
   
       const mediaLinks = Array.isArray(mediaField?.value) ? mediaField.value : [];
@@ -71,7 +81,7 @@ const Media = ({
             setValue: async (newValue) => {
               const updatedItems = [...items];
               const updatedFields = [...(updatedItems[index].fields || [])];
-          
+              
               updatedFields[fieldIndex] = {
                 key: generateKey('media', fieldName),
                 type: 'media',
