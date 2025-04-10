@@ -5,21 +5,23 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    Textarea,
     FormControl,
 } from '@contentful/f36-components';
 import { v4 as uuid } from 'uuid';
 import { useSDK } from '@contentful/react-apps-toolkit';
-import { FieldAppSDK, ValidationError } from '@contentful/app-sdk';
-import { RichTextEditor } from '@contentful/field-editor-rich-text';
+import { FieldAppSDK } from '@contentful/app-sdk';
 import { CloseIcon, PlusIcon } from '@contentful/f36-icons';
-
-/** An Item which represents an list item of the repeater app */
-interface Item {
-    id: string;
-    key: string;
-    value: any;
-}
+import Richtext from '../components/FieldOptions/Richtext';
+import Textarea from '../components/FieldOptions/Textarea';
+import Radio from '../components/FieldOptions/Radio';
+import Boolean from '../components/FieldOptions/Boolean';
+import Checkbox from '../components/FieldOptions/Checkbox';
+import NumberInput from '../components/FieldOptions/NumberInput';
+import Media from '../components/FieldOptions/Media';
+import Reference from '../components/FieldOptions/Reference';
+import Dropdown from '../components/FieldOptions/Dropdown';
+import { Field as FieldType, Item } from '../components/types';
+import { generateKey } from '../components/utility/generateKey';
 
 /** A simple utility function to create a 'blank' item
  * @returns A blank `Item` with a uuid
@@ -27,8 +29,7 @@ interface Item {
 function createItem(): Item {
     return {
         id: uuid(),
-        key: '',
-        value: '',
+        fields: [],
     };
 }
 
@@ -40,6 +41,8 @@ function createItem(): Item {
 const Field = () => {
     const sdk = useSDK<FieldAppSDK>();
     const [items, setItems] = useState<Item[]>([]);
+    const [repeaterFields, setRepeaterFields] = useState<FieldType[]>([]);
+    const [buttonCopy, setButtonCopy] = useState<String>("");
 
     useEffect(() => {
       const detach = sdk.field.onValueChanged((value: Item[]) => {
@@ -65,15 +68,35 @@ const Field = () => {
 
     useEffect(() => {
       console.log(sdk);
-    }, [sdk])
 
-    const updateItem = (index: number, property: string, value: any) => {
+      if (sdk.contentType.description) {
+        const JSONDesc = JSON.parse(sdk.contentType.description);
+        setButtonCopy(JSONDesc.buttonCopy);
+        setRepeaterFields(JSONDesc.fields);
+        console.log(JSONDesc);
+      }
+    }, [sdk]);
+
+    const updateItem = (itemIndex: number, fieldIndex: number, value: any, type: string, name: string) => {
       const updatedItems = [...items];
-      updatedItems[index] = { ...updatedItems[index], [property]: value };
+      const updatedFields = [...(updatedItems[itemIndex].fields || [])];
+    
+      updatedFields[fieldIndex] = {
+        ...(updatedFields[fieldIndex] || {}),
+        key: generateKey(type, name),
+        type: type,
+        value: value,
+      };
+    
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        fields: updatedFields,
+      };
       console.log(updatedItems);
+    
       setItems(updatedItems);
       sdk.field.setValue(updatedItems);
-    };
+    };    
 
     /** Deletes an item from the list */
     const deleteItem = (item: Item) => {
@@ -89,56 +112,43 @@ const Field = () => {
                             <TableCell style={{justifyContent: 'center', minWidth: '40px', background: "#f4f4f4", color: "#aaa", display: "grid", alignContent: 'center', borderRight: '1px solid #ccd0d4'}}>
                               {index + 1}
                             </TableCell>
-                            <TableCell style={{borderRight: '1px solid #ccd0d4'}}>
-                              <FormControl.Label>Question</FormControl.Label>
-                                <Textarea
-                                    id="key"
-                                    style={{ minWidth: '250px', height: '400px' }}
-                                    // labelText="Item Name"
-                                    value={item.key}
-                                    onChange={(e) => updateItem(index, 'key', e.target.value)}
-                                />
-                            </TableCell>
-                            <TableCell>
-                              <FormControl.Label>Answer</FormControl.Label>
-                              <RichTextEditor
-                                sdk={{
-                                  ...sdk,
-                                  field: {
-                                    ...sdk.field, // Include ALL methods first!
-                                    getValue: () => item.value || {},
-                                    setValue: async (value) => {
-                                      const updatedItems = [...items];
-                                      updatedItems[index] = { ...updatedItems[index], value };
+                            {repeaterFields.map((field, fieldIndex) => (
+                              <TableCell key={fieldIndex} style={{ borderRight: '1px solid #ccd0d4', minWidth: (field.type === 'reference' || field.type === 'media') ? '500px' : '220px' }}>
+                                <FormControl.Label>{field.name}</FormControl.Label>
 
-                                      setItems(updatedItems);
-
-                                      return sdk.field.setValue(updatedItems); // Return the full array to Contentful field storage
-                                    },
-                                    onSchemaErrorsChanged: (callback: (errors: ValidationError[]) => void) => () => {}, // No-op to satisfy the SDK
-                                    onIsDisabledChanged: (callback: (isDisabled: boolean) => void) => () => {}, // No-op to satisfy the SDK
-                                    onValueChanged(callback) {
-                                      // No-op to satisfy the SDK
-                                      return () => {};
-                                    },
-                                  },  
-                                }}
-                                isInitiallyDisabled={false}
-                                maxHeight={275}
-                                minHeight={275}
-                              />
-
-                            </TableCell>
-                            <TableCell style={{justifyContent: 'center', width: '40px', background: "#f4f4f4", color: "#aaa", display: "grid", alignContent: 'center', borderLeft: '1px solid #ccd0d4'}}>
+                                {field.type === 'textarea' ? (
+                                  <Textarea item={item} updateItem={updateItem} index={index} fieldIndex={fieldIndex} fieldName={field.name} />
+                                ) : field.type === 'richtext' ? (
+                                  <Richtext item={item} items={items} setItems={setItems} index={index} fieldIndex={fieldIndex} sdk={sdk} fieldName={field.name} />
+                                ) : field.type === 'radio' ? (
+                                  <Radio item={item} updateItem={updateItem} fieldIndex={fieldIndex} index={index} options={field.options} fieldName={field.name} />
+                                ) : field.type === 'checkbox' ? (
+                                  <Checkbox item={item} updateItem={updateItem} fieldIndex={fieldIndex} index={index} options={field.options} fieldName={field.name} />
+                                ) : field.type === 'number' ? (
+                                  <NumberInput item={item} updateItem={updateItem} fieldIndex={fieldIndex} index={index} fieldName={field.name} />
+                                ) : field.type === 'media' ? (
+                                  <Media item={item} items={items} setItems={setItems} index={index} options={field.options} fieldIndex={fieldIndex} sdk={sdk} fieldName={field.name} />
+                                ) : field.type === 'reference' ? (
+                                  <Reference item={item} items={items} setItems={setItems} index={index} options={field.options} fieldIndex={fieldIndex} sdk={sdk} fieldName={field.name} />
+                                ) : field.type === 'dropdown' ? (
+                                  <Dropdown item={item} updateItem={updateItem} fieldIndex={fieldIndex} index={index} options={field.options} fieldName={field.name} />
+                                ) : field.type === 'boolean' ? (
+                                  <Boolean item={item} updateItem={updateItem} fieldIndex={fieldIndex} index={index} options={field.options} fieldName={field.name} />
+                                ) : null}
+                              </TableCell>
+                            ))}
+                            
+                            <TableCell style={{justifyContent: 'center', marginLeft:'auto', width: '40px', background: "#f4f4f4", color: "#aaa", display: "grid", alignContent: 'center'}}>
                                 <Button variant="secondary" style={{ padding: '10px', height: '20px', minHeight: '20px', width: '20px', borderRadius: '50%' }} startIcon={<CloseIcon style={{ width:'16px' }} />} onClick={() => deleteItem(item)} />
                             </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
-            <Button style={{ justifySelf: 'flex-end', marginTop: '1rem' }} variant="primary" startIcon={<PlusIcon />} onClick={addNewItem}>Add Question</Button>
+            <Button style={{ justifySelf: 'flex-end', marginTop: '1rem' }} variant="primary" startIcon={<PlusIcon />} onClick={addNewItem}>{buttonCopy ? buttonCopy : "Add Item"}</Button>
         </div>
     );
 };
 
 export default Field;
+
